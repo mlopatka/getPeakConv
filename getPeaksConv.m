@@ -47,7 +47,7 @@ if numel(varargin) < 4
 else
     x = varargin{1}(:); % time
     y = varargin{2}(:); % intensity 
-    y = y./max(y);
+    %y = y./max(y);
     bandWidth = varargin{3};
     ResSigma = varargin{4};
 end
@@ -61,8 +61,8 @@ if ~and(isscalar(varargin{3}), isscalar(varargin{4}))
 end
 p = zeros(2,numel(y)); % preallocate 
 rt_Delta=mean(diff(x)); % this is the time step constant
-n = 4*ceil(bandWidth/rt_Delta); % round to integer values, this is the width of one peak in data points
-snMax = exp((-.5*((0/ResSigma).^2))./(ResSigma*sqrt(2*pi))); %optional different threshold than 0 
+n = 8*ceil(bandWidth/rt_Delta); % round to integer values, this is the width of one peak in data points
+snMax = 0;%exp((-.5*((0/ResSigma).^2))./(ResSigma*sqrt(2*pi))); %optional different threshold than 0 
 bandWidth = (bandWidth/rt_Delta); %recast bandwidth in terms of the points rather than in terms of Rt
 if mod(n,2) > 0, n = n+1; end % we want n to be even so that the points around i are symetrical
 % peaks affect  n+1 points, n points on either side of the centre point i. 
@@ -83,7 +83,7 @@ for i = 1:temp
     [modelHolder{i,4},modelHolder{i,1}] = Vm2Fun(Vm(1,:), bandWidth); % put the model into a cell array as an anonymous function 
 %     modelHolder{i,4} lists the peak centers asumed by the model
 %     modelHolder{i,1} holds the model as an annonymous function
-    if sum(Vm(1,n/2:(round(1.5*n)))) > 0
+    if sum(Vm(1,n/2:(round(1.5*n)))) > 0 %we only need to index the top spot, because we clean as we go, see line 106
        modelHolder{i,2} = true; % this Vm row supports H_p
     else
        modelHolder{i,2} = false;% this Vm row supports H_d
@@ -91,7 +91,7 @@ for i = 1:temp
 %     modelHolder{i,2} contains true if a peak is present in the inner window and flase otherwise
     modelHolder{i,3} = sum(Vm(1,:));
 %     modelHolder{i,3} holds the number of peaks specific to that model.
-    if numel(modelHolder{i,4})>1 % checks overlapping peaks
+    if modelHolder{i,3}>1 % only bother checking for overlapping peaks if more than 1 peak
         numPeaks = sum(or(pdist(modelHolder{i,4}', 'cityblock')<=round(n/2), (abs(modelHolder{i,4}-midPoint)<round(midPoint/2))));
         modelHolder{i,5} = ALPHA*dngp(numPeaks,ALPHA);
         if numPeaks == 0
@@ -114,12 +114,11 @@ if isempty(Vm), clear Vm; else error('indexing problem, not all VmRows considere
 close(h); %clean up the waitbar
 
 indM = size(modelHolder,1);
-x_t = ([midPoint-n:midPoint+n]-midPoint)';%linspace(-1,1,2*n+1)';%;
-% x_t = 1:(2*n+1);
+x_t = ([midPoint-n:midPoint+n]-midPoint)';
 yy=repmat(y',numel(x_t),1);
 i=1:numel(x_t);
-%temp=fliplr((numel(x_t)-1)./2-(i-1));
 temp=(numel(x_t)-1)./2-(i-1);
+
 for i=1:numel(x_t)
    yy(i,:)=circshift(yy(i,:),[0 temp(i)]);
 end
@@ -144,7 +143,6 @@ p_of_d_given_Hp = zeros([1, numel(y)]);
 p_of_d_given_Hd = zeros([1, numel(y)]);
 
 h = waitbar(0.0,'performing pointwise model evaluation');
-mask_holder = [];
 
 for m = 1:size(modelHolder,1)%iterate over all hypotheses
     mH = modelHolder(m,:);
@@ -165,12 +163,12 @@ for m = 1:size(modelHolder,1)%iterate over all hypotheses
     if m==1
         mask = true(size(y'));
     else
-        mask = sum((b(3:end,:)*snMax<0),1)==0;
+        mask = sum((b(3:end,:)<snMax),1)==0;
     end
     
-    mask_holder(m,1:numel(b(:,422))) = b(:,422)';
+%     mask_holder(m,1:numel(b(:,422))) = b(:,422)';
                 % PRIOR          % LIKELIHOOD          % MASK
-    model_prob = modelHolder{m,5}*exp(sum(logResProb,1).*mask); 
+    model_prob = modelHolder{m,5}*exp(sum(logResProb,1)).*mask; 
     % remove models fitting a negative (or super tiny if we want) 
     % gaussian as it is impossible for chromatography
 
@@ -195,11 +193,11 @@ p(end-n:end) = 0;
 end
 
 function Vm = genVm(N, maxP)
-    % Vn = [true false]; 
+    % Vm = [true false]; 
     % N = window size in indeces;
     % first we need to preallocate based on our maxP, this is a factorial
     % N^C_maxP = N!/(N-maxP)!maxP!
-    % otherwise this goes totally insane where n>22 leads to out of memory
+    % otherwise this goes totally insane where n>22 memory is insufficeint
     b = 0;
     for i = 1:maxP
         b = b + factorial(N)/((factorial(N-i)*factorial(i))); % calculate the number of permutations for exactly each number of peaks
