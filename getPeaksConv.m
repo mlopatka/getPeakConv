@@ -61,8 +61,8 @@ if ~and(isscalar(varargin{3}), isscalar(varargin{4}))
 end
 p = zeros(2,numel(y)); % preallocate 
 rt_Delta=mean(diff(x)); % this is the time step constant
-n = 8*ceil(bandWidth/rt_Delta); % round to integer values, this is the width of one peak in data points
-snMax = 0;%exp((-.5*((0/ResSigma).^2))./(ResSigma*sqrt(2*pi))); %optional different threshold than 0 
+n = 5*ceil(bandWidth/rt_Delta); % round to integer values, this is the width of one peak in data points
+snMax =(normpdf(0, 0, ResSigma)); %optional different threshold than 0 
 bandWidth = (bandWidth/rt_Delta); %recast bandwidth in terms of the points rather than in terms of Rt
 if mod(n,2) > 0, n = n+1; end % we want n to be even so that the points around i are symetrical
 % peaks affect  n+1 points, n points on either side of the centre point i. 
@@ -114,7 +114,8 @@ if isempty(Vm), clear Vm; else error('indexing problem, not all VmRows considere
 close(h); %clean up the waitbar
 
 indM = size(modelHolder,1);
-x_t = ([midPoint-n:midPoint+n]-midPoint)';
+% x_t = ([midPoint-n:midPoint+n]-midPoint)';
+x_t = [1:2*n+1]; %equivalent result.
 yy=repmat(y',numel(x_t),1);
 i=1:numel(x_t);
 temp=(numel(x_t)-1)./2-(i-1);
