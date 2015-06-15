@@ -153,10 +153,10 @@ for m = 1:size(modelHolder,1)%iterate over all hypotheses
     
     b=ones(size(X,2),numel(y));
     for i=1:size(p,1)
-        b(i,:)=conv(y',fliplr(p(i,:)),'same');
+        b(i,:)=conv(double(y)',fliplr(p(i,:)),'same');
     end
-    y_hat=X*b;
-    res = yy-y_hat;
+    y_hat=double(X)*b;
+    res = double(yy)-y_hat;
     
     %logResProb = log(normpdf(res,0,ResSigma));
     logResProb = log(1/(sqrt(2*pi)*ResSigma))-0.5.*((res./ResSigma).^2);
