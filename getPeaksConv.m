@@ -8,7 +8,7 @@ function p = getPeaksConv(varargin)
 % that a given point is affected by a chromatographic peak.
 %
 % Input:
-% p = getPeaksConv(x, y, bandWidth, ResSigma, ALPHA, MAX_PEAKS_PER_ROW)
+% p = getPeaksConv(x, y, bandWidth, ResSigma, ALPHA, MAX_PEAKS_PER_ROW, external_models)
 % 
 % x : Time index of each measurement
 % y : Intensity value of each measurement
@@ -20,13 +20,19 @@ function p = getPeaksConv(varargin)
 % Default = 2
 % ALPHA (optional): The saturation of the chromatogram [1 > ALPHA > 0]
 % Default = 0.25
+% external_models (optional): The contents of modelHolder normally
+% generated per parameter set. For batch processing similar chormatograms,
+% it can save a lot of time to generate these once and pass the models in.
+% Default = generated from other parameters
 %
 % Output:
 % p : Estiamted posterior probibility that the point at p is affected by a
 % chromatographic peak
 %
-% Example usage:
-% p = getPeaksConv(retention_time_vector, intenstiy_vector, 2.5, 1.2e-5, 0.3, 3);
+% Example usage (simplest case):
+% p = getPeaksConv(retention_time_vector, intenstiy_vector, 2.5, 1.2e-5);
+% Example usage (fully specified case):
+% p = getPeaksConv(retention_time_vector, intenstiy_vector, 2.5, 1.2e-5, 0.3, 3, external_models);
 %
 % If this software is useful to your academic work, please cite our
 % publication in lieu of thanks:
@@ -39,7 +45,8 @@ function p = getPeaksConv(varargin)
 % Gabriel Vivó-Truyols <g.vivotruyols@uva.nl> Revised: 23rd April, 2015
 
 %% parse inputs
-if numel(varargin) > 6, error('too many input arguments'); end
+if numel(varargin) > 7, error('too many input arguments'); end
+if numel(varargin) > 6, external_models = varargin{7}; end
 if numel(varargin) > 5, MAX_PEAKS_PER_ROW = varargin{6}; else MAX_PEAKS_PER_ROW = 2; end
 if numel(varargin) > 4, ALPHA = varargin{5}; else ALPHA = 0.25; end
 if numel(varargin) < 4
@@ -70,48 +77,60 @@ if mod(n,2) > 0, n = n+1; end % we want n to be even so that the points around i
 % H_d_i: point i is not "in a peak"
 % if point i is "in a peak" then the peak centre must be in the interval [i-n/2:i+n/2]
 
-%% precalcualte the possible peak configurations insode
-h = waitbar(0.0,'Generating Vm Matrix');
-Vm = genVm(((2*n)+1), MAX_PEAKS_PER_ROW); % size of the window is define here as ((2*n)+1) points
-
-%% precalculate the models and store them in a cell
-temp = size(Vm,1);
-modelHolder = cell(temp,5);
-midPoint = round((2*n+1)/2);
-
-for i = 1:temp
-    [modelHolder{i,4},modelHolder{i,1}] = Vm2Fun(Vm(1,:), bandWidth); % put the model into a cell array as an anonymous function 
-%     modelHolder{i,4} lists the peak centers asumed by the model
-%     modelHolder{i,1} holds the model as an annonymous function
-    if sum(Vm(1,n/2:(round(1.5*n)))) > 0 %we only need to index the top spot, because we clean as we go, see line 106
-       modelHolder{i,2} = true; % this Vm row supports H_p
-    else
-       modelHolder{i,2} = false;% this Vm row supports H_d
-    end
-%     modelHolder{i,2} contains true if a peak is present in the inner window and flase otherwise
-    modelHolder{i,3} = sum(Vm(1,:));
-%     modelHolder{i,3} holds the number of peaks specific to that model.
-    if modelHolder{i,3}>1 % only bother checking for overlapping peaks if more than 1 peak
-        numPeaks = sum(or(pdist(modelHolder{i,4}', 'cityblock')<=round(n/2), (abs(modelHolder{i,4}-midPoint)<round(midPoint/2))));
-        modelHolder{i,5} = ALPHA*dngp(numPeaks,ALPHA);
-        if numPeaks == 0
-            modelHolder{i,5} = ALPHA*dngp(1,ALPHA); % multiple peaks not overlapping so singlet prior is applied
-        end
-    else
-        modelHolder{i,5} = ALPHA*dngp(1,ALPHA); % overlap not possible
-    end
-    % application of Davis-Giddings prior  
-%     modelHolder{i,5} holds the the davis and giddings prior value 
-    waitbar((0.05+((i/temp)*0.95)),h);
-    Vm(1,:)=[]; %delete the first index in Vm so that we are clearing space as we process the matric row by row
+%% precalcualte the possible peak configurations inside
+if ~exist('external_models', 'var')
+    h = waitbar(0.0,'Generating Vm Matrix');
 end
 
-modelHolder{1,5} = (ALPHA*dngp(0,ALPHA)); % zero peaks model prior
+Vm = genVm(((2*n)+1), MAX_PEAKS_PER_ROW); % size of the window is define here as ((2*n)+1) points
+    
+if exist('external_models', 'var')
+    if size(external_models,1)==size(Vm,1)
+        modelHolder = external_models;
+    else
+        error('externally specified model is not compatible with other input parameters, try rebuilding model structure');
+    end
+else
+    h = waitbar(0.0,'Generating Vm Matrix');
+%% precalculate the models and store them in a cell
+    temp = size(Vm,1);
+    modelHolder = cell(temp,5);
+    midPoint = round((2*n+1)/2);
 
-% housekeeping
-clear temp;
-if isempty(Vm), clear Vm; else error('indexing problem, not all VmRows considered'); end
-close(h); %clean up the waitbar
+    for i = 1:temp
+        [modelHolder{i,4},modelHolder{i,1}] = Vm2Fun(Vm(1,:), bandWidth); % put the model into a cell array as an anonymous function 
+    %     modelHolder{i,4} lists the peak centers asumed by the model
+    %     modelHolder{i,1} holds the model as an annonymous function
+        if sum(Vm(1,n/2:(round(1.5*n)))) > 0 %we only need to index the top spot, because we clean as we go, see line 106
+           modelHolder{i,2} = true; % this Vm row supports H_p
+        else
+           modelHolder{i,2} = false;% this Vm row supports H_d
+        end
+    %     modelHolder{i,2} contains true if a peak is present in the inner window and flase otherwise
+        modelHolder{i,3} = sum(Vm(1,:));
+    %     modelHolder{i,3} holds the number of peaks specific to that model.
+        if modelHolder{i,3}>1 % only bother checking for overlapping peaks if more than 1 peak
+            numPeaks = sum(or(pdist(modelHolder{i,4}', 'cityblock')<=round(n/2), (abs(modelHolder{i,4}-midPoint)<round(midPoint/2))));
+            modelHolder{i,5} = ALPHA*dngp(numPeaks,ALPHA);
+            if numPeaks == 0
+                modelHolder{i,5} = ALPHA*dngp(1,ALPHA); % multiple peaks not overlapping so singlet prior is applied
+            end
+        else
+            modelHolder{i,5} = ALPHA*dngp(1,ALPHA); % overlap not possible
+        end
+        % application of Davis-Giddings prior  
+    %     modelHolder{i,5} holds the the davis and giddings prior value 
+        waitbar((0.05+((i/temp)*0.95)),h);
+        Vm(1,:)=[]; %delete the first index in Vm so that we are clearing space as we process the matric row by row
+    end
+
+    modelHolder{1,5} = (ALPHA*dngp(0,ALPHA)); % zero peaks model prior
+
+    % housekeeping
+    clear temp;
+    if isempty(Vm), clear Vm; else error('indexing problem, not all VmRows considered'); end
+    close(h); %clean up the waitbar
+end %%% this is where we pick up if the model is externally specified.
 
 indM = size(modelHolder,1);
 % x_t = ([midPoint-n:midPoint+n]-midPoint)';
