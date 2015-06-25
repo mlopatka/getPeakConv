@@ -98,7 +98,11 @@ else
     midPoint = round((2*n+1)/2);
 
     for i = 1:temp
-        [modelHolder{i,4},modelHolder{i,1}] = Vm2Fun(Vm(1,:), bandWidth); % put the model into a cell array as an anonymous function 
+        try 
+            [modelHolder{i,4},modelHolder{i,1}] = Vm2Fun(Vm(1,:), bandWidth); % put the model into a cell array as an anonymous function 
+        catch
+            disp(num2str(i));
+        end
     %     modelHolder{i,4} lists the peak centers asumed by the model
     %     modelHolder{i,1} holds the model as an annonymous function
         if sum(Vm(1,n/2:(round(1.5*n)))) > 0 %we only need to index the top spot, because we clean as we go, see line 106
@@ -110,7 +114,9 @@ else
         modelHolder{i,3} = sum(Vm(1,:));
     %     modelHolder{i,3} holds the number of peaks specific to that model.
         if modelHolder{i,3}>1 % only bother checking for overlapping peaks if more than 1 peak
-            numPeaks = sum(or(pdist(modelHolder{i,4}', 'cityblock')<=round(n/2), (abs(modelHolder{i,4}-midPoint)<round(midPoint/2))));
+            numPeaks = sum(or(...
+                sum(pdist2(modelHolder{i,4}',modelHolder{i,4}', 'cityblock'),2 > 0)>0, ... % peaks too close ot each other
+                abs(modelHolder{i,4}-midPoint)<round(midPoint/2))); %peaks bunched in the center
             modelHolder{i,5} = ALPHA*dngp(numPeaks,ALPHA);
             if numPeaks == 0
                 modelHolder{i,5} = ALPHA*dngp(1,ALPHA); % multiple peaks not overlapping so singlet prior is applied
