@@ -8,7 +8,7 @@ function p = getPeaksConv(varargin)
 % that a given point is affected by a chromatographic peak.
 %
 % Input:
-% p = getPeaksConv(x, y, bandWidth, ResSigma, ALPHA, MAX_PEAKS_PER_ROW, external_models)
+% p = getPeaksConv(x, y, bandWidth, ResSigma, ALPHA, MAX_PEAKS_PER_ROW, verbosity_flag, external_models)
 % 
 % x : Time index of each measurement
 % y : Intensity value of each measurement
@@ -24,6 +24,9 @@ function p = getPeaksConv(varargin)
 % generated per parameter set. For batch processing similar chormatograms,
 % it can save a lot of time to generate these once and pass the models in.
 % Default = generated from other parameters
+% verbosity_flag: 0 for no output and no waitbars
+%                 1 for waitbars only
+%                 2 verbose mode
 %
 % Output:
 % p : Estiamted posterior probibility that the point at p is affected by a
@@ -32,7 +35,7 @@ function p = getPeaksConv(varargin)
 % Example usage (simplest case):
 % p = getPeaksConv(retention_time_vector, intenstiy_vector, 2.5, 1.2e-5);
 % Example usage (fully specified case):
-% p = getPeaksConv(retention_time_vector, intenstiy_vector, 2.5, 1.2e-5, 0.3, 3, external_models);
+% p = getPeaksConv(retention_time_vector, intenstiy_vector, 2.5, 1.2e-5, 0.3, 3, 2, external_models);
 %
 % If this software is useful to your academic work, please cite our
 % publication in lieu of thanks:
@@ -43,10 +46,12 @@ function p = getPeaksConv(varargin)
 %
 % Author: Martin Lopatka <martin.lopatka@gmail.com> Created: 29th August, 2013
 % Gabriel Vivó-Truyols <g.vivotruyols@uva.nl> Revised: 23rd April, 2015
+% Maintained by Martin Lopatka
 
 %% parse inputs
-if numel(varargin) > 7, error('too many input arguments'); end
-if numel(varargin) > 6, external_models = varargin{7}; end
+if numel(varargin) > 8, error('too many input arguments'); end
+if numel(varargin) > 7, external_models = varargin{8}; end
+if numel(varargin) > 6, verbosity_flag = varargin{7}; end
 if numel(varargin) > 5, MAX_PEAKS_PER_ROW = varargin{6}; else MAX_PEAKS_PER_ROW = 2; end
 if numel(varargin) > 4, ALPHA = varargin{5}; else ALPHA = 0.25; end
 if numel(varargin) < 4
@@ -91,7 +96,9 @@ if exist('external_models', 'var')
         error('externally specified model is not compatible with other input parameters, try rebuilding model structure');
     end
 else
-    h = waitbar(0.0,'Generating Vm Matrix');
+    if verbosity_flag > 0 
+        h = waitbar(0.0,'Generating Vm Matrix');
+    end
 %% precalculate the models and store them in a cell
     temp = size(Vm,1);
     modelHolder = cell(temp,5);
@@ -126,7 +133,7 @@ else
         end
         % application of Davis-Giddings prior  
     %     modelHolder{i,5} holds the the davis and giddings prior value 
-        waitbar((0.05+((i/temp)*0.95)),h);
+        if verbosity_flag > 0,  waitbar((0.05+((i/temp)*0.95)),h); end
         Vm(1,:)=[]; %delete the first index in Vm so that we are clearing space as we process the matric row by row
     end
 
@@ -168,7 +175,9 @@ PRIOR_NOPEAK = 1-PRIOR_PEAK;
 p_of_d_given_Hp = zeros([1, numel(y)]);
 p_of_d_given_Hd = zeros([1, numel(y)]);
 
-h = waitbar(0.0,'performing pointwise model evaluation');
+if verbosity_flag > 0
+    h = waitbar(0.0,'performing pointwise model evaluation');
+end
 
 for m = 1:size(modelHolder,1)%iterate over all hypotheses
     mH = modelHolder(m,:);
@@ -204,11 +213,13 @@ for m = 1:size(modelHolder,1)%iterate over all hypotheses
         p_of_d_given_Hd = p_of_d_given_Hd(~isnan(p_of_d_given_Hd)) + model_prob;
     end
 
-    waitbar(m/indM,h);
+    if verbosity_flag > 0, waitbar(m/indM,h); end
 end     
 
-delete(get(h, 'children'))
-close(h)
+if verbosity_flag > 0
+    delete(get(h, 'children'))
+    close(h)
+end
 
 p = (p_of_d_given_Hp*PRIOR_PEAK)./((p_of_d_given_Hp*PRIOR_PEAK)+(p_of_d_given_Hd*(PRIOR_NOPEAK)));%posterior probability
 
