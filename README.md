@@ -1,4 +1,3 @@
-getPeaksConv
   getPeaksCov - Probabilistic peak detection of first order chromatographic
   or time-series data. For a provided pair of vectors (time and intensity)
   the function uses probabilistic reasoning to evaluate an exhaustive set 
