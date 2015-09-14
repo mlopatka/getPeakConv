@@ -1,6 +1,3 @@
-# getPeakConv
-Probabilistic peak detection for first order chromatographic data 
-
   getPeaksCov - Probabilistic peak detection of first order chromatographic
   or time-series data. For a provided pair of vectors (time and intensity)
   the function uses probabilistic reasoning to evaluate an exhaustive set 
@@ -10,7 +7,7 @@ Probabilistic peak detection for first order chromatographic data
   that a given point is affected by a chromatographic peak.
  
   Input:
-  p = getPeaksConv(x, y, bandWidth, ResSigma, ALPHA, MAX_PEAKS_PER_ROW)
+  p = getPeaksConv(x, y, bandWidth, ResSigma, ALPHA, MAX_PEAKS_PER_ROW, verbosity_flag, external_models)
   
   x : Time index of each measurement
   y : Intensity value of each measurement
@@ -22,13 +19,22 @@ Probabilistic peak detection for first order chromatographic data
   Default = 2
   ALPHA (optional): The saturation of the chromatogram [1 > ALPHA > 0]
   Default = 0.25
+  external_models (optional): The contents of modelHolder normally
+  generated per parameter set. For batch processing similar chormatograms,
+  it can save a lot of time to generate these once and pass the models in.
+  Default = generated from other parameters
+  verbosity_flag: 0 for no output and no waitbars
+                  1 for waitbars only
+                  2 verbose mode
  
   Output:
   p : Estiamted posterior probibility that the point at p is affected by a
   chromatographic peak
  
-  Example usage:
-  p = getPeaksConv(retention_time_vector, intenstiy_vector, 2.5, 1.2e-5, 0.3, 3);
+  Example usage (simplest case):
+  p = getPeaksConv(retention_time_vector, intenstiy_vector, 2.5, 1.2e-5);
+  Example usage (fully specified case):
+  p = getPeaksConv(retention_time_vector, intenstiy_vector, 2.5, 1.2e-5, 0.3, 3, 2, external_models);
  
   If this software is useful to your academic work, please cite our
   publication in lieu of thanks:
@@ -39,3 +45,4 @@ Probabilistic peak detection for first order chromatographic data
  
   Author: Martin Lopatka <martin.lopatka@gmail.com> Created: 29th August, 2013
   Gabriel Vivó-Truyols <g.vivotruyols@uva.nl> Revised: 23rd April, 2015
+  Maintained by Martin Lopatka
