@@ -51,7 +51,7 @@ function p = getPeaksConv(varargin)
 %% parse inputs
 if numel(varargin) > 8, error('too many input arguments'); end
 if numel(varargin) > 7, external_models = varargin{8}; end
-if numel(varargin) > 6, verbosity_flag = varargin{7}; end
+if numel(varargin) > 6, verbosity_flag = varargin{7}; else verbosity_flag = 1; end
 if numel(varargin) > 5, MAX_PEAKS_PER_ROW = varargin{6}; else MAX_PEAKS_PER_ROW = 2; end
 if numel(varargin) > 4, ALPHA = varargin{5}; else ALPHA = 0.25; end
 if numel(varargin) < 4
@@ -74,7 +74,8 @@ end
 p = zeros(2,numel(y)); % preallocate 
 rt_Delta=mean(diff(x)); % this is the time step constant
 n = 5*ceil(bandWidth/rt_Delta); % round to integer values, this is the width of one peak in data points
-snMax =(normpdf(0, 0, ResSigma)); %optional different threshold than 0 
+% snMax =(normpdf(0, 0, ResSigma)); %optional different threshold than 0 
+snMax = 0;
 bandWidth = (bandWidth/rt_Delta); %recast bandwidth in terms of the points rather than in terms of Rt
 if mod(n,2) > 0, n = n+1; end % we want n to be even so that the points around i are symetrical
 % peaks affect  n+1 points, n points on either side of the centre point i. 
@@ -83,7 +84,7 @@ if mod(n,2) > 0, n = n+1; end % we want n to be even so that the points around i
 % if point i is "in a peak" then the peak centre must be in the interval [i-n/2:i+n/2]
 
 %% precalcualte the possible peak configurations inside
-if ~exist('external_models', 'var')
+if or(~exist('external_models', 'var'), verbosity_flag > 0)
     h = waitbar(0.0,'Generating Vm Matrix');
 end
 
@@ -93,7 +94,7 @@ if exist('external_models', 'var')
     if size(external_models,1)==size(Vm,1)
         modelHolder = external_models;
     else
-        error('externally specified model is not compatible with other input parameters, try rebuilding model structure');
+            error('externally specified model is not compatible with other input parameters, try rebuilding model structure');
     end
 else
     if verbosity_flag > 0 
@@ -143,7 +144,9 @@ else
     clear temp;
     if isempty(Vm), clear Vm; else error('indexing problem, not all VmRows considered'); end
     close(h); %clean up the waitbar
-end %%% this is where we pick up if the model is externally specified.
+end
+
+%% this is where we pick up if the model is externally specified.
 
 indM = size(modelHolder,1);
 % x_t = ([midPoint-n:midPoint+n]-midPoint)';
@@ -203,14 +206,16 @@ for m = 1:size(modelHolder,1)%iterate over all hypotheses
     
 %     mask_holder(m,1:numel(b(:,422))) = b(:,422)';
                 % PRIOR          % LIKELIHOOD          % MASK
-    model_prob = modelHolder{m,5}*exp(sum(logResProb,1)).*mask; 
+    model_prob = modelHolder{m,5}*sum(exp(logResProb),1).*mask; 
     % remove models fitting a negative (or super tiny if we want) 
     % gaussian as it is impossible for chromatography
 
     if mH{2}==true %hp supporting hypothesis
-        p_of_d_given_Hp = p_of_d_given_Hp(~isnan(p_of_d_given_Hp)) + model_prob;
+        p_of_d_given_Hp(isnan(p_of_d_given_Hp))=0;
+        p_of_d_given_Hp = p_of_d_given_Hp + model_prob;   
     else
-        p_of_d_given_Hd = p_of_d_given_Hd(~isnan(p_of_d_given_Hd)) + model_prob;
+        p_of_d_given_Hd(isnan(p_of_d_given_Hd))=0;
+        p_of_d_given_Hd = p_of_d_given_Hd + model_prob;
     end
 
     if verbosity_flag > 0, waitbar(m/indM,h); end
