@@ -84,7 +84,7 @@ if mod(n,2) > 0, n = n+1; end % we want n to be even so that the points around i
 % if point i is "in a peak" then the peak centre must be in the interval [i-n/2:i+n/2]
 
 %% precalcualte the possible peak configurations inside
-if or(~exist('external_models', 'var'), verbosity_flag > 0)
+if and(~exist('external_models', 'var'), verbosity_flag > 0)
     h = waitbar(0.0,'Generating Vm Matrix');
 end
 
@@ -94,7 +94,7 @@ if exist('external_models', 'var')
     if size(external_models,1)==size(Vm,1)
         modelHolder = external_models;
     else
-            error('externally specified model is not compatible with other input parameters, try rebuilding model structure');
+        error('externally specified model is not compatible with other input parameters, try rebuilding model structure');
     end
 else
     if verbosity_flag > 0 
@@ -143,7 +143,8 @@ else
     % housekeeping
     clear temp;
     if isempty(Vm), clear Vm; else error('indexing problem, not all VmRows considered'); end
-    close(h); %clean up the waitbar
+    if exist('h', 'var'), close(h); end
+    %clean up the waitbar
 end
 
 %% this is where we pick up if the model is externally specified.
@@ -303,4 +304,3 @@ function A = exportXMatrix(j, model, mus, band)
     end % (s)noggy in honour of the Nuge
     %numerical solution for the least squares fit problem
 end
-
